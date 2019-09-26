@@ -27,6 +27,7 @@
 #include "feature/dirclient/download_status_st.h"
 #include "feature/nodelist/microdesc_st.h"
 #include "feature/nodelist/node_st.h"
+#include "feature/dircache/dirserv.c"
 
 typedef struct {
   const char *input;
@@ -756,6 +757,7 @@ static download_status_t descbr_digest_2_dl;
 static const char *descbr_expected_list =
     "616408544C7345822696074A1A3DFA16AB381CBD\n"
     "06E8067246967265DBCB6641631B530EFEC12DC3\n";
+
 /*
  * Flag to make all descbr queries fail, to simulate not being
  * configured such that such queries make sense.
@@ -1689,6 +1691,187 @@ test_download_status_bridge(void *arg)
   return;
 }
 
+/** Mock cached consensus */
+static cached_dir_t *mock_ns_consensus_cache;
+static cached_dir_t *mock_microdesc_consensus_cache;
+
+int
+mock_we_want_to_fetch_flavor(const or_options_t *options,
+                             int flavor);
+
+int
+mock_we_want_to_fetch_flavor(const or_options_t *options,
+                             int flavor) {
+  if (options->FetchUselessDescriptors ||
+      flavor == FLAV_NS || flavor == FLAV_MICRODESC) {
+    return 1;
+  }
+  return 0;
+}
+
+/**  Mock the function that retrieves consensus from
+ * cache. These use a global variable so that they can
+ * be cleared from within the test. The actual code
+ * retains the pointer to the consensus data, but
+ * we are doing this here, to prevent memory leaks
+ * from within the tests */
+static cached_dir_t *
+mock_dirserv_get_consensus(const char *flavor_name);
+
+static cached_dir_t *
+mock_dirserv_get_consensus(const char *flavor_name)
+{
+  if (!strcmp(flavor_name, "ns")) {
+    mock_ns_consensus_cache = tor_malloc_zero(sizeof(cached_dir_t));
+    mock_ns_consensus_cache->dir = tor_strdup("mock_ns_consensus");
+    return mock_ns_consensus_cache;
+  } else {
+    mock_microdesc_consensus_cache = tor_malloc_zero(sizeof(cached_dir_t));
+    mock_microdesc_consensus_cache->dir = tor_strdup(
+                                            "mock_microdesc_consensus");
+    return mock_microdesc_consensus_cache;
+  }
+}
+
+/** Mock for the function that returns the name of the
+ * file containing the consensuses. */
+char *
+mock_networkstatus_get_cache_fname(int flav,
+                                   const char *flavor_name,
+                                   int unverified_consensus);
+
+char *
+mock_networkstatus_get_cache_fname(int flav,
+                                   const char *flavor_name,
+                                   int unverified_consensus)
+{
+  /** A function needs to do something with
+   * all variables that are passed as arguments */
+  flav = flav & 1;
+  unverified_consensus = unverified_consensus & 1;
+  return tor_strdup(flavor_name);
+}
+
+/** Mock the function that retrieves consensuses
+ *  from a files in the directory. */
+tor_mmap_t *
+mock_tor_mmap_file(const char* filename);
+
+tor_mmap_t *
+mock_tor_mmap_file(const char* filename)
+{
+  tor_mmap_t *res;
+  res = tor_malloc_zero(sizeof(tor_mmap_t));
+  if (!strcmp(filename, "ns")) {
+    res->data = "mock_ns_consensus";
+  }
+  if (!strcmp(filename, "microdesc")) {
+    res->data = "mock_microdesc_consensus";
+  }
+  res->size = strlen(res->data);
+  return res;
+}
+
+int
+mock_tor_munmap_file(tor_mmap_t *handle);
+
+/** Mock the function that clears file data
+ * loaded into the memory */
+int
+mock_tor_munmap_file(tor_mmap_t *handle)
+{
+  tor_free(handle);
+  return 0;
+}
+
+static void
+test_getinfo_helper_dir_from_file(void *arg)
+{
+  /* We just need one of these to pass, it doesn't matter what's in it */
+  control_connection_t dummy;
+  /* Get results out */
+  char *answer = NULL;
+  const char *errmsg = NULL;
+
+  (void)arg;
+
+  setup_bridge_mocks();
+  MOCK(tor_mmap_file, mock_tor_mmap_file);
+  MOCK(tor_munmap_file, mock_tor_munmap_file);
+  MOCK(networkstatus_get_cache_fname,
+       mock_networkstatus_get_cache_fname);
+
+  getinfo_helper_dir(&dummy,
+                     "dir/status-vote/current/consensus",
+                     &answer,
+                     &errmsg);
+  tt_str_op(answer, OP_EQ, "mock_ns_consensus");
+  tt_ptr_op(errmsg, OP_EQ, NULL);
+  tor_free(answer);
+  errmsg = NULL;
+
+  getinfo_helper_dir(&dummy,
+                     "dir/status-vote/current/consensus-microdesc",
+                     &answer,
+                     &errmsg);
+  tt_str_op(answer, OP_EQ, "mock_microdesc_consensus");
+  tt_ptr_op(errmsg, OP_EQ, NULL);
+  errmsg = NULL;
+
+ done:
+  clear_bridge_mocks();
+  tor_free(answer);
+  UNMOCK(tor_mmap_file);
+  UNMOCK(tor_munmap_file);
+  UNMOCK(networkstatus_get_cache_fname);
+  return;
+}
+
+static void
+test_getinfo_helper_dir_from_cache(void *arg)
+{
+  /* We just need one of these to pass, it doesn't matter what's in it */
+  control_connection_t dummy;
+  /* Get results out */
+  char *answer = NULL;
+  const char *errmsg = NULL;
+
+  (void)arg;
+
+  setup_bridge_mocks();
+  MOCK(we_want_to_fetch_flavor, mock_we_want_to_fetch_flavor);
+  MOCK(dirserv_get_consensus, mock_dirserv_get_consensus);
+
+  getinfo_helper_dir(&dummy,
+                     "dir/status-vote/current/consensus",
+                     &answer,
+                     &errmsg);
+  tt_str_op(answer, OP_EQ, "mock_ns_consensus");
+  tt_ptr_op(errmsg, OP_EQ, NULL);
+  tor_free(answer);
+  tor_free(mock_ns_consensus_cache->dir);
+  tor_free(mock_ns_consensus_cache);
+  errmsg = NULL;
+
+  getinfo_helper_dir(&dummy,
+                     "dir/status-vote/current/consensus-microdesc",
+                     &answer,
+                     &errmsg);
+  tt_str_op(answer, OP_EQ, "mock_microdesc_consensus");
+  tt_ptr_op(errmsg, OP_EQ, NULL);
+  tor_free(mock_microdesc_consensus_cache->dir);
+  tor_free(answer);
+  errmsg = NULL;
+
+ done:
+  clear_bridge_mocks();
+  tor_free(answer);
+  tor_free(mock_microdesc_consensus_cache);
+  UNMOCK(we_want_to_fetch_flavor);
+  UNMOCK(dirserv_get_consensus);
+  return;
+}
+
 /** Set timeval to a mock date and time. This is necessary
  * to make tor_gettimeofday() mockable. */
 static void
@@ -1740,7 +1923,6 @@ test_current_time(void *arg)
  done:
   UNMOCK(tor_gettimeofday);
   tor_free(answer);
-
   return;
 }
 
@@ -1838,6 +2020,10 @@ struct testcase_t controller_tests[] = {
     NULL },
   { "download_status_consensus", test_download_status_consensus, 0, NULL,
     NULL },
+  {"getinfo_helper_dir_from_cache", test_getinfo_helper_dir_from_cache,
+   0, NULL, NULL },
+  {"getinfo_helper_dir_from_file", test_getinfo_helper_dir_from_file, 0, NULL,
+   NULL },
   { "download_status_cert", test_download_status_cert, 0, NULL,
     NULL },
   { "download_status_desc", test_download_status_desc, 0, NULL, NULL },
@@ -1846,3 +2032,4 @@ struct testcase_t controller_tests[] = {
   { "getinfo_md_all", test_getinfo_md_all, 0, NULL, NULL },
   END_OF_TESTCASES
 };
+

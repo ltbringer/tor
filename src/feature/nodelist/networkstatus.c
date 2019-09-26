@@ -216,10 +216,11 @@ networkstatus_reset_download_failures(void)
 }
 
 /** Return the filename used to cache the consensus of a given flavor */
-static char *
-networkstatus_get_cache_fname(int flav,
-                              const char *flavorname,
-                              int unverified_consensus)
+MOCK_IMPL(char *,
+          networkstatus_get_cache_fname,
+          (int flav,
+          const char *flavorname,
+          int unverified_consensus))
 {
   char buf[128];
   const char *prefix;
@@ -856,8 +857,9 @@ router_get_consensus_status_by_id(const char *digest)
  *
  * For certificate fetches, use we_want_to_fetch_unknown_auth_certs, and
  * for serving fetched documents, use directory_caches_dir_info. */
-int
-we_want_to_fetch_flavor(const or_options_t *options, int flavor)
+MOCK_IMPL(int,
+          we_want_to_fetch_flavor,
+          (const or_options_t *options, int flavor))
 {
   if (flavor < 0 || flavor > N_CONSENSUS_FLAVORS) {
     /* This flavor is crazy; we don't want it */

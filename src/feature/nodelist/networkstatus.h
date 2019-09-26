@@ -16,7 +16,12 @@
 
 void networkstatus_reset_warnings(void);
 void networkstatus_reset_download_failures(void);
-tor_mmap_t *networkstatus_map_cached_consensus(const char *flavorname);
+MOCK_DECL(char *,
+          networkstatus_get_cache_fname,
+          (int flav,
+           const char *flavorname,
+           int unverified_consensus));
+tor_mmap_t * networkstatus_map_cached_consensus(const char *flavorname);
 int router_reload_consensus_networkstatus(void);
 void routerstatus_free_(routerstatus_t *rs);
 #define routerstatus_free(rs) \
@@ -71,7 +76,9 @@ const routerstatus_t *router_get_consensus_status_by_descriptor_digest(
 MOCK_DECL(routerstatus_t *,
           router_get_mutable_consensus_status_by_descriptor_digest,
           (networkstatus_t *consensus, const char *digest));
-int we_want_to_fetch_flavor(const or_options_t *options, int flavor);
+MOCK_DECL(int,
+          we_want_to_fetch_flavor,
+          (const or_options_t *options, int flavor));
 int we_want_to_fetch_unknown_auth_certs(const or_options_t *options);
 void networkstatus_consensus_download_failed(int status_code,
                                              const char *flavname);
