@@ -50,7 +50,6 @@ STATIC int getinfo_helper_downloads(
     const char **errmsg);
 STATIC int getinfo_helper_current_consensus(
     int flavor,
-    const char* flavor_name,
     char **answer,
     const char **errmsg);
 STATIC int getinfo_helper_dir(

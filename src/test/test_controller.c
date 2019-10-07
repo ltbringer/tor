@@ -1695,24 +1695,9 @@ test_download_status_bridge(void *arg)
 static cached_dir_t *mock_ns_consensus_cache;
 static cached_dir_t *mock_microdesc_consensus_cache;
 
-int
-mock_we_want_to_fetch_flavor(const or_options_t *options,
-                             int flavor);
-
-int
-mock_we_want_to_fetch_flavor(const or_options_t *options,
-                             int flavor) {
-  if (options->FetchUselessDescriptors ||
-      flavor == FLAV_NS || flavor == FLAV_MICRODESC) {
-    return 1;
-  }
-  return 0;
-}
-
-/**  Mock the function that retrieves consensus from
- * cache. These use a global variable so that they can
- * be cleared from within the test. The actual code
- * retains the pointer to the consensus data, but
+/**  Mock the function that retrieves consensus from cache. These use a
+ * global variable so that they can be cleared from within the test.
+ * The actual code retains the pointer to the consensus data, but
  * we are doing this here, to prevent memory leaks
  * from within the tests */
 static cached_dir_t *
@@ -1747,8 +1732,8 @@ mock_networkstatus_get_cache_fname(int flav,
 {
   /** A function needs to do something with
    * all variables that are passed as arguments */
-  flav = flav & 1;
-  unverified_consensus = unverified_consensus & 1;
+  (void) flav;
+  (void) unverified_consensus;
   return tor_strdup(flavor_name);
 }
 
@@ -1785,7 +1770,7 @@ mock_tor_munmap_file(tor_mmap_t *handle)
 }
 
 static void
-test_getinfo_helper_dir_from_file(void *arg)
+test_getinfo_helper_current_consensus_from_file(void *arg)
 {
   /* We just need one of these to pass, it doesn't matter what's in it */
   control_connection_t dummy;
@@ -1828,7 +1813,7 @@ test_getinfo_helper_dir_from_file(void *arg)
 }
 
 static void
-test_getinfo_helper_dir_from_cache(void *arg)
+test_getinfo_helper_current_consensus_from_cache(void *arg)
 {
   /* We just need one of these to pass, it doesn't matter what's in it */
   control_connection_t dummy;
@@ -1838,8 +1823,9 @@ test_getinfo_helper_dir_from_cache(void *arg)
 
   (void)arg;
 
+  or_options_t* options = get_options_mutable();
+  options->FetchUselessDescriptors = 1;
   setup_bridge_mocks();
-  MOCK(we_want_to_fetch_flavor, mock_we_want_to_fetch_flavor);
   MOCK(dirserv_get_consensus, mock_dirserv_get_consensus);
 
   getinfo_helper_dir(&dummy,
@@ -1867,7 +1853,6 @@ test_getinfo_helper_dir_from_cache(void *arg)
   clear_bridge_mocks();
   tor_free(answer);
   tor_free(mock_microdesc_consensus_cache);
-  UNMOCK(we_want_to_fetch_flavor);
   UNMOCK(dirserv_get_consensus);
   return;
 }
@@ -2020,10 +2005,10 @@ struct testcase_t controller_tests[] = {
     NULL },
   { "download_status_consensus", test_download_status_consensus, 0, NULL,
     NULL },
-  {"getinfo_helper_dir_from_cache", test_getinfo_helper_dir_from_cache,
-   0, NULL, NULL },
-  {"getinfo_helper_dir_from_file", test_getinfo_helper_dir_from_file, 0, NULL,
-   NULL },
+  {"getinfo_helper_current_consensus_from_cache",
+   test_getinfo_helper_current_consensus_from_cache, 0, NULL, NULL },
+  {"getinfo_helper_current_consensus_from_cache",
+   test_getinfo_helper_current_consensus_from_file, 0, NULL, NULL },
   { "download_status_cert", test_download_status_cert, 0, NULL,
     NULL },
   { "download_status_desc", test_download_status_desc, 0, NULL, NULL },

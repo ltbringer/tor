@@ -325,14 +325,34 @@ getinfo_helper_current_time(control_connection_t *control_conn,
   return 0;
 }
 
-/** Fetch network-status or micro-descriptor
+/** Map a consensus flavor to its name
+ *  returns "" if nothing matches
+ */
+STATIC char *
+map_flavor_to_flavor_name(int flavor)
+{
+  if (flavor == FLAV_NS) {
+    return "ns";
+  } else if (flavor == FLAV_MICRODESC) {
+    return "microdesc";
+  } else {
+    return "";
+  }
+}
+
+/** GETINFO helper for dumping different consensus flavors
  * returns: 0 on success -1 on error. */
 STATIC int
 getinfo_helper_current_consensus(int flavor,
-                                 const char *flavor_name,
                                  char** answer,
                                  const char** errmsg)
 {
+  const char *flavor_name = map_flavor_to_flavor_name();
+  if (!strcmp(flavor_name, "")) {
+    *errmsg = "Could not open cached consensus. "
+      "Make sure FetchUselessDescriptors is set to 1.";
+    return -1;
+  }
   if (we_want_to_fetch_flavor(get_options(), flavor)) {
     /** Check from the cache */
     const cached_dir_t *consensus = dirserv_get_consensus(flavor_name);
