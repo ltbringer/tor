@@ -328,8 +328,8 @@ getinfo_helper_current_time(control_connection_t *control_conn,
 /** Map a consensus flavor to its name
  *  returns "" if nothing matches
  */
-STATIC char *
-map_flavor_to_flavor_name(int flavor)
+STATIC const char *
+map_flavor_to_name(int flavor)
 {
   if (flavor == FLAV_NS) {
     return "ns";
@@ -347,7 +347,7 @@ getinfo_helper_current_consensus(int flavor,
                                  char** answer,
                                  const char** errmsg)
 {
-  const char *flavor_name = map_flavor_to_flavor_name();
+  const char *flavor_name = map_flavor_to_name(flavor);
   if (!strcmp(flavor_name, "")) {
     *errmsg = "Could not open cached consensus. "
       "Make sure FetchUselessDescriptors is set to 1.";
