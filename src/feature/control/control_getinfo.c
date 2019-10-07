@@ -629,7 +629,6 @@ getinfo_helper_dir(control_connection_t *control_conn,
     *answer = tor_strdup("");
   } else if (!strcmp(question, "dir/status-vote/current/consensus")) {
     int consensus_result = getinfo_helper_current_consensus(FLAV_NS,
-                                                            "ns",
                                                             answer, errmsg);
     if (consensus_result == -1) {
       return -1;
@@ -637,7 +636,6 @@ getinfo_helper_dir(control_connection_t *control_conn,
   } else if (!strcmp(question,
                      "dir/status-vote/current/consensus-microdesc")) {
     int consensus_result = getinfo_helper_current_consensus(FLAV_MICRODESC,
-                                                            "microdesc",
                                                             answer, errmsg);
     if (consensus_result == -1) {
         return -1;
