@@ -3,6 +3,7 @@
 
 #define CONTROL_CMD_PRIVATE
 #define CONTROL_GETINFO_PRIVATE
+#include <regex.h>
 #include "core/or/or.h"
 #include "lib/crypt_ops/crypto_ed25519.h"
 #include "feature/client/bridges.h"
@@ -1727,12 +1728,19 @@ tor_mmap_t *
 mock_tor_mmap_file(const char* filename)
 {
   tor_mmap_t *res;
+  regex_t ns_file_regex, microdesc_file_regex;
+  int ns_match, microdesc_match;
   res = tor_malloc_zero(sizeof(tor_mmap_t));
-  if (!strcmp(filename, "cached_consensus")) {
+  regcomp(&ns_file_regex, "cached-consensus", REG_EXTENDED);
+  regcomp(&microdesc_file_regex, "cached-microdesc-consensus", REG_EXTENDED);
+  ns_match = regexec(&ns_file_regex, filename, 0, NULL, 0);
+  microdesc_match = regexec(&microdesc_file_regex, filename, 0, NULL, 0);
+  if (!ns_match) {
     res->data = "mock_ns_consensus";
-  }
-  if (!strcmp(filename, "cached_microdesc_consensus")) {
+  } else if (!microdesc_match) {
     res->data = "mock_microdesc_consensus";
+  } else {
+    res->data = ".";
   }
   res->size = strlen(res->data);
   return res;
@@ -1800,10 +1808,10 @@ test_getinfo_helper_current_consensus_from_cache(void *arg)
   const char *errmsg = NULL;
 
   (void)arg;
-
-  or_options_t* options = get_options_mutable();
-  options->FetchUselessDescriptors = 1;
   setup_bridge_mocks();
+  or_options_t *options = get_options_mutable();
+  int previous_fetch_value = options->FetchUselessDescriptors;
+  options->FetchUselessDescriptors = 1;
   MOCK(dirserv_get_consensus, mock_dirserv_get_consensus);
 
   getinfo_helper_dir(&dummy,
@@ -1826,6 +1834,7 @@ test_getinfo_helper_current_consensus_from_cache(void *arg)
   tor_free(mock_microdesc_consensus_cache->dir);
   tor_free(answer);
   errmsg = NULL;
+  options->FetchUselessDescriptors = previous_fetch_value;
 
  done:
   clear_bridge_mocks();
@@ -1985,7 +1994,7 @@ struct testcase_t controller_tests[] = {
     NULL },
   {"getinfo_helper_current_consensus_from_cache",
    test_getinfo_helper_current_consensus_from_cache, 0, NULL, NULL },
-  {"getinfo_helper_current_consensus_from_cache",
+  {"getinfo_helper_current_consensus_from_file",
    test_getinfo_helper_current_consensus_from_file, 0, NULL, NULL },
   { "download_status_cert", test_download_status_cert, 0, NULL,
     NULL },
