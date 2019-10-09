@@ -1718,25 +1718,6 @@ mock_dirserv_get_consensus(const char *flavor_name)
   }
 }
 
-/** Mock for the function that returns the name of the
- * file containing the consensuses. */
-char *
-mock_networkstatus_get_cache_fname(int flav,
-                                   const char *flavor_name,
-                                   int unverified_consensus);
-
-char *
-mock_networkstatus_get_cache_fname(int flav,
-                                   const char *flavor_name,
-                                   int unverified_consensus)
-{
-  /** A function needs to do something with
-   * all variables that are passed as arguments */
-  (void) flav;
-  (void) unverified_consensus;
-  return tor_strdup(flavor_name);
-}
-
 /** Mock the function that retrieves consensuses
  *  from a files in the directory. */
 tor_mmap_t *
@@ -1747,10 +1728,10 @@ mock_tor_mmap_file(const char* filename)
 {
   tor_mmap_t *res;
   res = tor_malloc_zero(sizeof(tor_mmap_t));
-  if (!strcmp(filename, "ns")) {
+  if (!strcmp(filename, "cached_consensus")) {
     res->data = "mock_ns_consensus";
   }
-  if (!strcmp(filename, "microdesc")) {
+  if (!strcmp(filename, "cached_microdesc_consensus")) {
     res->data = "mock_microdesc_consensus";
   }
   res->size = strlen(res->data);
@@ -1783,8 +1764,6 @@ test_getinfo_helper_current_consensus_from_file(void *arg)
   setup_bridge_mocks();
   MOCK(tor_mmap_file, mock_tor_mmap_file);
   MOCK(tor_munmap_file, mock_tor_munmap_file);
-  MOCK(networkstatus_get_cache_fname,
-       mock_networkstatus_get_cache_fname);
 
   getinfo_helper_dir(&dummy,
                      "dir/status-vote/current/consensus",
@@ -1808,7 +1787,6 @@ test_getinfo_helper_current_consensus_from_file(void *arg)
   tor_free(answer);
   UNMOCK(tor_mmap_file);
   UNMOCK(tor_munmap_file);
-  UNMOCK(networkstatus_get_cache_fname);
   return;
 }
 
