@@ -3,7 +3,6 @@
 
 #define CONTROL_CMD_PRIVATE
 #define CONTROL_GETINFO_PRIVATE
-#include <regex.h>
 #include "core/or/or.h"
 #include "lib/crypt_ops/crypto_ed25519.h"
 #include "feature/client/bridges.h"
@@ -1728,16 +1727,10 @@ tor_mmap_t *
 mock_tor_mmap_file(const char* filename)
 {
   tor_mmap_t *res;
-  regex_t ns_file_regex, microdesc_file_regex;
-  int ns_match, microdesc_match;
   res = tor_malloc_zero(sizeof(tor_mmap_t));
-  regcomp(&ns_file_regex, "cached-consensus", REG_EXTENDED);
-  regcomp(&microdesc_file_regex, "cached-microdesc-consensus", REG_EXTENDED);
-  ns_match = regexec(&ns_file_regex, filename, 0, NULL, 0);
-  microdesc_match = regexec(&microdesc_file_regex, filename, 0, NULL, 0);
-  if (!ns_match) {
+  if (strstr(filename, "cached-consensus") != NULL) {
     res->data = "mock_ns_consensus";
-  } else if (!microdesc_match) {
+  } else if (strstr(filename, "cached-microdesc-consensus") != NULL) {
     res->data = "mock_microdesc_consensus";
   } else {
     res->data = ".";
